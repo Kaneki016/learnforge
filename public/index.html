@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LearnForge — topic in, knowledge graph out</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b24; --panel2: #1f2330; --text: #e8eaf2;
+    --muted: #9aa0b4; --accent: #7c6cf5; --accent2: #4fd1a5; --warn: #f5a97f;
+    --err: #ed6a6a; --border: #2a2f40;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 2px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin-bottom: 20px; font-size: 14px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 22px; }
+  .tab {
+    padding: 9px 20px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--muted); cursor: pointer; font-size: 14px; font-weight: 600;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px; margin-bottom: 18px;
+  }
+  .row { display: flex; gap: 10px; }
+  input[type=text] {
+    flex: 1; padding: 12px 16px; font-size: 15px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button {
+    padding: 11px 20px; font-size: 14px; font-weight: 600; border: none;
+    border-radius: 10px; background: var(--accent); color: white; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: transparent; color: var(--err); border: 1px solid var(--err); }
+  button.small { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+  .qblock { margin-bottom: 18px; }
+  .qblock .q { font-weight: 600; margin-bottom: 8px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .opt {
+    padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); cursor: pointer; font-size: 14px;
+  }
+  .opt.sel { background: var(--accent); border-color: var(--accent); }
+  .free { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 14px; }
+  .status { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; flex: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .module { border-left: 3px solid var(--accent); padding: 10px 14px; margin: 12px 0;
+    background: var(--panel2); border-radius: 0 10px 10px 0; }
+  .module h3 { margin: 0 0 4px; font-size: 15px; }
+  .module .goal { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+  .chip.done { border-color: var(--accent2); color: var(--accent2); }
+  .milestone { font-size: 13px; color: var(--accent2); margin-top: 6px; }
+  .log { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .log .warn { color: var(--warn); }
+  .log .err { color: var(--err); }
+  .done-box { border-color: var(--accent2); }
+  .done-box h2 { color: var(--accent2); margin-top: 0; }
+  code { background: var(--panel2); padding: 2px 7px; border-radius: 6px; font-size: 13px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 30px; text-align: center; }
+  .hidden { display: none !important; }
+  /* library */
+  .topic-card { display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; padding: 16px 18px; }
+  .topic-card .info { flex: 1; min-width: 0; cursor: pointer; }
+  .topic-card h3 { margin: 0 0 3px; font-size: 16px; }
+  .topic-card .desc { color: var(--muted); font-size: 13px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .topic-card .stats { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .result-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .result-item:last-child { border-bottom: none; }
+  .result-item:hover { background: var(--panel2); }
+  .result-item .t { font-weight: 600; font-size: 14px; }
+  .result-item .t .badge { font-size: 10px; background: var(--accent); padding: 2px 7px;
+    border-radius: 999px; margin-left: 8px; vertical-align: 1px; }
+  .result-item .s { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .result-item .topic-label { color: var(--accent2); font-size: 11px; }
+  mark { background: var(--accent); color: white; border-radius: 3px; padding: 0 2px; }
+  /* note viewer */
+  .note-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .note-head .spacer { flex: 1; }
+  #noteBody { line-height: 1.65; font-size: 15px; }
+  #noteBody h1 { font-size: 24px; }
+  #noteBody h2 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 28px; }
+  #noteBody blockquote { border-left: 3px solid var(--accent); margin: 12px 0; padding: 8px 14px;
+    background: var(--panel2); border-radius: 0 8px 8px 0; color: var(--text); }
+  #noteBody a.wiki { color: var(--accent2); text-decoration: none; border-bottom: 1px dashed var(--accent2); cursor: pointer; }
+  #noteBody pre.mermaid { background: var(--panel2); border-radius: 10px; padding: 14px; text-align: center; }
+  #noteBody input[type=checkbox] { accent-color: var(--accent2); }
+  #noteBody ul { padding-left: 22px; }
+  .askbox { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .askbox textarea { width: 100%; min-height: 70px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+    font-family: inherit; font-size: 14px; resize: vertical; }
+  .empty { color: var(--muted); text-align: center; padding: 30px 0; font-size: 14px; }
+  .exist-box { border-color: var(--warn); }
+  .exist-box h3 { color: var(--warn); margin-top: 0; }
+  /* progress bars */
+  .bar { height: 6px; background: var(--bg); border-radius: 999px; margin-top: 8px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent2); border-radius: 999px; transition: width .3s; }
+  .pct { font-size: 11px; color: var(--accent2); margin-left: 6px; }
+  /* library view toggle */
+  .subtabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .subtab { padding: 6px 16px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--muted); cursor: pointer; font-size: 13px; }
+  .subtab.active { background: var(--panel2); color: var(--text); border-color: var(--accent); }
+  #graphBox { height: 560px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; }
+  /* review */
+  .review-card { text-align: center; padding: 34px 24px; }
+  .review-card .src { font-size: 12px; color: var(--accent2); margin-bottom: 14px; }
+  .review-card .q-text { font-size: 19px; font-weight: 600; line-height: 1.5; }
+  .review-card .a-text { font-size: 15px; color: var(--muted); margin-top: 18px; line-height: 1.6;
+    border-top: 1px solid var(--border); padding-top: 18px; }
+  .grades { display: flex; gap: 8px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
+  .grades button { min-width: 84px; }
+  .g-again { background: var(--err); }
+  .g-hard { background: var(--warn); color: #1a1a1a; }
+  .g-good { background: var(--accent); }
+  .g-easy { background: var(--accent2); color: #1a1a1a; }
+  .review-count { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  #noteBody li.moc-item input[type=checkbox] { cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Learn<span>Forge</span></h1>
+  <div class="sub">Agents scope, research and design your path → linked Obsidian notes with diagrams.</div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabLearn">🎓 Learn</button>
+    <button class="tab" id="tabLibrary">📚 Library</button>
+    <button class="tab" id="tabReview">🔁 Review <span id="dueBadge"></span></button>
+  </div>
+
+  <!-- ================= LEARN VIEW ================= -->
+  <div id="learnView">
+    <div class="card" id="topicCard">
+      <div class="row">
+        <input type="text" id="topicInput" placeholder="What do you want to learn? e.g. Bayesian statistics, fermentation, music theory…" />
+        <button id="startBtn">Learn it</button>
+      </div>
+    </div>
+
+    <div class="card exist-box hidden" id="existCard">
+      <h3>Already in your knowledge base</h3>
+      <div class="sub">You've learned something similar before — revisit it instead of building a duplicate?</div>
+      <div id="existList"></div>
+      <div class="row" style="margin-top:12px;">
+        <button class="ghost" id="buildAnywayBtn">Build a new one anyway</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="scopeCard">
+      <div style="font-weight:600; margin-bottom:4px;">Let's narrow this down</div>
+      <div class="sub" id="scopeReason"></div>
+      <div id="questions"></div>
+      <button id="answersBtn">Build my learning path</button>
+    </div>
+
+    <div class="card hidden" id="progressCard">
+      <div class="status"><div class="spinner" id="spin"></div><div id="statusMsg">Starting…</div></div>
+      <div id="outline"></div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="card done-box hidden" id="doneCard">
+      <h2>Your knowledge graph is ready</h2>
+      <div id="doneMsg"></div>
+      <p style="color:var(--muted); font-size:14px;">
+        Browse it in the <b>Library</b> tab, or open the vault folder in Obsidian for the full graph view.
+      </p>
+      <div class="row">
+        <button id="viewInLibBtn">Open in Library</button>
+        <button class="ghost" id="againBtn">Learn another topic</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= LIBRARY VIEW ================= -->
+  <div id="libraryView" class="hidden">
+    <div id="libraryHome">
+      <div class="subtabs">
+        <button class="subtab active" id="subList">📋 List</button>
+        <button class="subtab" id="subGraph">🕸 Graph</button>
+      </div>
+      <div id="listWrap">
+        <div class="card">
+          <div class="row">
+            <input type="text" id="searchInput" placeholder="Search all your saved knowledge…" />
+          </div>
+          <div id="searchResults"></div>
+        </div>
+        <h2 style="font-size:17px; margin:18px 0 10px;">Your topics</h2>
+        <div id="topicList"><div class="empty">Loading…</div></div>
+      </div>
+      <div id="graphBox" class="hidden"></div>
+    </div>
+
+    <div id="noteViewWrap" class="hidden">
+      <div class="note-head">
+        <button class="ghost small" id="backBtn">← Back</button>
+        <span class="spacer"></span>
+        <button class="danger small" id="deleteNoteBtn">🗑 Delete this note</button>
+      </div>
+      <div class="card"><div id="noteBody"></div>
+        <div class="askbox">
+          <div style="font-weight:600; margin-bottom:8px;">💬 Ask the agent about this note</div>
+          <textarea id="askInput" placeholder="e.g. Can you explain this with a simpler example? How does this relate to X?"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button id="askBtn">Ask</button>
+            <span class="status hidden" id="askStatus"><span class="spinner"></span><span>Thinking…</span></span>
+          </div>
+          <div class="sub" style="margin-top:8px;">Answers are saved into the note under “Clarifications”, so they're in Obsidian too.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= REVIEW VIEW ================= -->
+  <div id="reviewView" class="hidden">
+    <div class="review-count" id="reviewCount"></div>
+    <div class="card review-card hidden" id="reviewCard">
+      <div class="src" id="rvSrc"></div>
+      <div class="q-text" id="rvQ"></div>
+      <div class="a-text hidden" id="rvA"></div>
+      <div class="grades">
+        <button id="rvShow">Show answer</button>
+        <button class="g-again hidden" data-grade="again">Again</button>
+        <button class="g-hard hidden" data-grade="hard">Hard</button>
+        <button class="g-good hidden" data-grade="good">Good</button>
+        <button class="g-easy hidden" data-grade="easy">Easy</button>
+      </div>
+    </div>
+    <div class="card hidden" id="reviewDone">
+      <div class="empty">🎉 All caught up — nothing due right now.<br><span id="rvTotal"></span></div>
+    </div>
+  </div>
+
+  <div class="meta" id="meta"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let topic = "", scopeQs = [], pendingScope = null, currentNotePath = null, currentTopicName = null, lastBuiltMoc = null;
+
+mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
+
+fetch("/api/info").then(r => r.json()).then(i => {
+  $("meta").textContent = `provider: ${i.provider} · vault: ${i.vault}`;
+});
+
+// ---------- tabs ----------
+$("tabLearn").onclick = () => switchTab("learn");
+$("tabLibrary").onclick = () => switchTab("library");
+$("tabReview").onclick = () => switchTab("review");
+function switchTab(t) {
+  $("tabLearn").classList.toggle("active", t === "learn");
+  $("tabLibrary").classList.toggle("active", t === "library");
+  $("tabReview").classList.toggle("active", t === "review");
+  $("learnView").classList.toggle("hidden", t !== "learn");
+  $("libraryView").classList.toggle("hidden", t !== "library");
+  $("reviewView").classList.toggle("hidden", t !== "review");
+  if (t === "library") { showLibraryHome(); loadTopics(); }
+  if (t === "review") loadReview();
+}
+
+// Library sub-tabs: list <-> graph
+$("subList").onclick = () => switchSub("list");
+$("subGraph").onclick = () => switchSub("graph");
+function switchSub(s) {
+  $("subList").classList.toggle("active", s === "list");
+  $("subGraph").classList.toggle("active", s === "graph");
+  $("listWrap").classList.toggle("hidden", s !== "list");
+  $("graphBox").classList.toggle("hidden", s !== "graph");
+  if (s === "graph") loadGraph();
+}
+
+// ---------- learn flow ----------
+$("startBtn").onclick = start;
+$("topicInput").addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+$("answersBtn").onclick = () => generate(collectAnswers());
+$("againBtn").onclick = () => location.reload();
+$("buildAnywayBtn").onclick = () => { $("existCard").classList.add("hidden"); proceedAfterScope(pendingScope); };
+$("viewInLibBtn").onclick = () => { switchTab("library"); if (lastBuiltMoc) openNoteByTitle(lastBuiltMoc); };
+
+async function start() {
+  topic = $("topicInput").value.trim();
+  if (!topic) return;
+  $("startBtn").disabled = true; $("startBtn").textContent = "Checking…";
+  try {
+    const r = await fetch("/api/scope", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ topic })
+    });
+    const s = await r.json();
+    if (!r.ok) throw new Error(s.error || "Scope failed");
+    pendingScope = s;
+    if (s.existing && s.existing.length) showExisting(s.existing);
+    else proceedAfterScope(s);
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    $("startBtn").disabled = false; $("startBtn").textContent = "Learn it";
+  }
+}
+
+function showExisting(existing) {
+  const box = $("existList");
+  box.innerHTML = existing.map(t => `
+    <div class="card topic-card" style="margin-bottom:8px;">
+      <div class="info" data-moc="${t.moc || ""}">
+        <h3>${t.name}</h3>
+        <div class="stats">${t.noteCount} notes · started ${t.created || "?"}</div>
+      </div>
+      <button class="small" data-open="${t.moc || ""}">Open</button>
+    </div>`).join("");
+  box.querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
+    switchTab("library"); openNote(b.dataset.open);
+  });
+  $("existCard").classList.remove("hidden");
+}
+
+function proceedAfterScope(s) {
+  if (s.tooBroad && s.questions.length) showQuestions(s);
+  else generate([]);
+}
+
+function showQuestions(s) {
+  scopeQs = s.questions;
+  $("scopeReason").textContent = s.reason || "This topic is broad — a few questions will make your path much better.";
+  const box = $("questions");
+  box.innerHTML = "";
+  s.questions.forEach((q, qi) => {
+    const div = document.createElement("div");
+    div.className = "qblock";
+    div.innerHTML = `<div class="q">${q.question}</div>
+      <div class="opts">${(q.options || []).map(o => `<button class="opt" data-q="${qi}">${o}</button>`).join("")}</div>
+      <input class="free" data-q="${qi}" placeholder="…or type your own answer" />`;
+    box.appendChild(div);
+  });
+  box.querySelectorAll(".opt").forEach(b => b.onclick = () => {
+    b.parentElement.querySelectorAll(".opt").forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    b.parentElement.parentElement.querySelector(".free").value = "";
+  });
+  $("scopeCard").classList.remove("hidden");
+}
+
+function collectAnswers() {
+  return scopeQs.map((q, qi) => {
+    const sel = document.querySelector(`.opt.sel[data-q="${qi}"]`);
+    const free = document.querySelector(`.free[data-q="${qi}"]`).value.trim();
+    return { question: q.question, answer: free || (sel ? sel.textContent : "no preference") };
+  });
+}
+
+async function generate(answers) {
+  $("scopeCard").classList.add("hidden");
+  $("topicCard").classList.add("hidden");
+  $("existCard").classList.add("hidden");
+  $("progressCard").classList.remove("hidden");
+
+  const res = await fetch("/api/generate", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic, answers })
+  });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      handleEvent(buf.slice(0, idx));
+      buf = buf.slice(idx + 2);
+    }
+  }
+}
+
+function handleEvent(chunk) {
+  const ev = (chunk.match(/^event: (.+)$/m) || [])[1];
+  const dataLine = (chunk.match(/^data: (.+)$/m) || [])[1];
+  if (!ev || !dataLine) return;
+  const d = JSON.parse(dataLine);
+
+  if (ev === "status") $("statusMsg").textContent = d.msg;
+  if (ev === "outline") renderOutline(d);
+  if (ev === "moduleDone") {
+    document.querySelectorAll(`#mod-${d.module} .chip`).forEach(c => c.classList.add("done"));
+  }
+  if (ev === "warn") $("log").innerHTML += `<div class="warn">⚠ ${d.msg}</div>`;
+  if (ev === "error") {
+    $("spin").style.display = "none";
+    $("statusMsg").textContent = "Failed.";
+    $("log").innerHTML += `<div class="err">✖ ${d.msg}</div>`;
+  }
+  if (ev === "done") {
+    $("spin").style.display = "none";
+    $("statusMsg").textContent = "Done.";
+    lastBuiltMoc = d.moc;
+    $("doneMsg").innerHTML =
+      `<p><strong>${d.noteCount}</strong> notes written to <code>${d.topicDir}</code></p>
+       <p>Start here: <code>${d.moc}</code></p>`;
+    $("doneCard").classList.remove("hidden");
+  }
+}
+
+function renderOutline(plan) {
+  const el = $("outline");
+  el.innerHTML = `<h2 style="font-size:18px;">${plan.title}</h2>
+    <div class="sub">${plan.summary || ""}</div>` +
+    plan.modules.map((m, i) => `
+      <div class="module" id="mod-${i}">
+        <h3>Module ${i + 1}: ${m.name}</h3>
+        <div class="goal">${m.goal || ""}</div>
+        <div class="chips">${m.concepts.map(c => `<span class="chip">${c}</span>`).join("")}</div>
+        ${m.milestone ? `<div class="milestone">🏁 ${m.milestone}</div>` : ""}
+      </div>`).join("");
+}
+
+// ---------- library: topics ----------
+async function loadTopics() {
+  const r = await fetch("/api/topics");
+  const d = await r.json();
+  const el = $("topicList");
+  if (!d.topics || !d.topics.length) {
+    el.innerHTML = `<div class="empty">Nothing here yet — go learn something! 🎓</div>`;
+    return;
+  }
+  el.innerHTML = d.topics.map(t => {
+    const pct = t.total ? Math.round(100 * t.done / t.total) : 0;
+    return `
+    <div class="card topic-card">
+      <div class="info" data-moc="${t.moc || ""}">
+        <h3>${t.name}</h3>
+        <div class="desc">${t.summary || ""}</div>
+        <div class="stats">${t.noteCount} notes · started ${t.created || "?"} ·
+          ${t.done}/${t.total} learned<span class="pct">${pct}%</span></div>
+        <div class="bar"><div style="width:${pct}%"></div></div>
+      </div>
+      <button class="danger small" data-del="${t.name}">🗑</button>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".info").forEach(x => x.onclick = () => x.dataset.moc && openNote(x.dataset.moc));
+  el.querySelectorAll("[data-del]").forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const name = b.dataset.del;
+    if (!confirm(`Delete the whole topic "${name}" and all its notes? This also removes it from Obsidian.`)) return;
+    await fetch("/api/delete", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: name }) });
+    loadTopics();
+  });
+}
+
+// ---------- library: search ----------
+let searchTimer = null;
+$("searchInput").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(doSearch, 250);
+});
+async function doSearch() {
+  const q = $("searchInput").value.trim();
+  const box = $("searchResults");
+  if (!q) { box.innerHTML = ""; return; }
+  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  const d = await r.json();
+  if (!d.results.length) { box.innerHTML = `<div class="empty">No matches for “${escapeHtml(q)}”.</div>`; return; }
+  const hl = (s) => escapeHtml(s).replace(new RegExp(escapeReg(q), "gi"), (m) => `<mark>${m}</mark>`);
+  box.innerHTML = d.results.map(x => `
+    <div class="result-item" data-path="${x.path}">
+      <div class="topic-label">${escapeHtml(x.topic)}</div>
+      <div class="t">${hl(x.title)}${x.isMoc ? '<span class="badge">roadmap</span>' : ""}</div>
+      ${x.snippet ? `<div class="s">${hl(x.snippet)}</div>` : ""}
+    </div>`).join("");
+  box.querySelectorAll(".result-item").forEach(el => el.onclick = () => openNote(el.dataset.path));
+}
+function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function escapeReg(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+// ---------- library: note viewer ----------
+function showLibraryHome() {
+  $("libraryHome").classList.remove("hidden");
+  $("noteViewWrap").classList.add("hidden");
+  currentNotePath = null;
+}
+$("backBtn").onclick = showLibraryHome;
+
+async function openNote(rel) {
+  const r = await fetch(`/api/note?path=${encodeURIComponent(rel)}`);
+  const d = await r.json();
+  if (!r.ok) { alert(d.error || "Could not open note"); return; }
+  currentNotePath = rel;
+  currentTopicName = rel.split("/")[0];
+  renderNote(d.content);
+  $("libraryHome").classList.add("hidden");
+  $("noteViewWrap").classList.remove("hidden");
+  $("askInput").value = "";
+  window.scrollTo(0, 0);
+}
+
+async function openNoteByTitle(title) {
+  const r = await fetch(`/api/search?q=${encodeURIComponent(title)}`);
+  const d = await r.json();
+  const hit = d.results.find(x => x.title === title) || d.results[0];
+  if (hit) openNote(hit.path);
+}
+
+function renderNote(md) {
+  // Strip YAML frontmatter.
+  let body = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+  // Obsidian callouts -> plain blockquotes with an emoji.
+  body = body.replace(/> \[!(\w+)\]\s*/g, (_, t) =>
+    `> ${({info:"ℹ️",success:"🏁",question:"💬"}[t] || "📌")} `);
+  // Wikilinks -> internal anchors.
+  body = body.replace(/\[\[([^\]]+)\]\]/g, (_, name) =>
+    `<a class="wiki" data-wiki="${escapeHtml(name)}">${escapeHtml(name)}</a>`);
+  const html = marked.parse(body, { breaks: true });
+  $("noteBody").innerHTML = html;
+
+  // Mermaid blocks: marked renders ```mermaid as <pre><code class="language-mermaid">.
+  $("noteBody").querySelectorAll("code.language-mermaid").forEach((code, i) => {
+    const pre = document.createElement("pre");
+    pre.className = "mermaid";
+    pre.textContent = code.textContent;
+    code.closest("pre").replaceWith(pre);
+  });
+  try { mermaid.run({ nodes: $("noteBody").querySelectorAll("pre.mermaid") }); } catch (e) {}
+
+  // Wikilink navigation: same topic folder first, then anywhere in the vault.
+  $("noteBody").querySelectorAll("a.wiki").forEach(a => a.onclick = async () => {
+    const name = a.dataset.wiki;
+    const r = await fetch(`/api/note?path=${encodeURIComponent(`${currentTopicName}/${name}.md`)}`);
+    if (r.ok) {
+      const d = await r.json();
+      currentNotePath = `${currentTopicName}/${name}.md`;
+      renderNote(d.content);
+      window.scrollTo(0, 0);
+    } else {
+      openNoteByTitle(name);
+    }
+  });
+
+  // Roadmap checkboxes: make them clickable and persist to the MOC file.
+  if (currentNotePath && currentNotePath.endsWith(" MOC.md")) {
+    $("noteBody").querySelectorAll("li").forEach(li => {
+      const cb = li.querySelector('input[type=checkbox]');
+      const wiki = li.querySelector("a.wiki");
+      if (!cb || !wiki) return;
+      li.classList.add("moc-item");
+      cb.disabled = false;
+      cb.onchange = async () => {
+        await fetch("/api/progress", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ moc: currentNotePath, concept: wiki.dataset.wiki, done: cb.checked })
+        });
+      };
+    });
+  }
+}
+
+// ---------- ask the agent ----------
+$("askBtn").onclick = async () => {
+  const question = $("askInput").value.trim();
+  if (!question || !currentNotePath) return;
+  $("askBtn").disabled = true;
+  $("askStatus").classList.remove("hidden");
+  try {
+    const r = await fetch("/api/ask", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: currentNotePath, question })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Ask failed");
+    renderNote(d.content);
+    $("askInput").value = "";
+    // Scroll to the freshly added clarification at the bottom.
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    $("askBtn").disabled = false;
+    $("askStatus").classList.add("hidden");
+  }
+};
+
+// ---------- review (spaced repetition) ----------
+let reviewQueue = [], rvTotalCards = 0;
+
+async function refreshDueBadge() {
+  try {
+    const d = await (await fetch("/api/review/due")).json();
+    $("dueBadge").textContent = d.due.length ? `(${d.due.length})` : "";
+  } catch (e) {}
+}
+refreshDueBadge();
+
+async function loadReview() {
+  const d = await (await fetch("/api/review/due")).json();
+  reviewQueue = d.due;
+  rvTotalCards = d.totalCards;
+  renderReviewCard();
+}
+
+function renderReviewCard() {
+  $("reviewCount").textContent = reviewQueue.length
+    ? `${reviewQueue.length} card${reviewQueue.length > 1 ? "s" : ""} due · ${rvTotalCards} total in your knowledge base`
+    : "";
+  $("dueBadge").textContent = reviewQueue.length ? `(${reviewQueue.length})` : "";
+  if (!reviewQueue.length) {
+    $("reviewCard").classList.add("hidden");
+    $("reviewDone").classList.remove("hidden");
+    $("rvTotal").textContent = `${rvTotalCards} cards scheduled across your topics.`;
+    return;
+  }
+  $("reviewDone").classList.add("hidden");
+  $("reviewCard").classList.remove("hidden");
+  const c = reviewQueue[0];
+  $("rvSrc").textContent = `${c.topic} › ${c.note}`;
+  $("rvQ").textContent = c.q;
+  $("rvA").textContent = c.a;
+  $("rvA").classList.add("hidden");
+  $("rvShow").classList.remove("hidden");
+  document.querySelectorAll("[data-grade]").forEach(b => b.classList.add("hidden"));
+}
+
+$("rvShow").onclick = () => {
+  $("rvA").classList.remove("hidden");
+  $("rvShow").classList.add("hidden");
+  document.querySelectorAll("[data-grade]").forEach(b => b.classList.remove("hidden"));
+};
+
+document.querySelectorAll("[data-grade]").forEach(b => b.onclick = async () => {
+  const card = reviewQueue.shift();
+  const grade = b.dataset.grade;
+  if (grade === "again") reviewQueue.push(card); // retry later this session
+  fetch("/api/review/grade", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: card.id, grade })
+  });
+  renderReviewCard();
+});
+
+// ---------- knowledge graph ----------
+let network = null;
+const PALETTE = ["#7c6cf5", "#4fd1a5", "#f5a97f", "#6cb8f5", "#ed6a9e", "#c3e88d", "#f5d76c", "#9a6cf5"];
+
+async function loadGraph() {
+  const d = await (await fetch("/api/graph")).json();
+  const topics = [...new Set(d.nodes.map(n => n.topic))];
+  const nodes = d.nodes.map(n => ({
+    id: n.id,
+    label: n.label.replace(/ MOC$/, ""),
+    shape: n.isMoc ? "box" : "dot",
+    size: n.isMoc ? 22 : 10,
+    color: PALETTE[topics.indexOf(n.topic) % PALETTE.length],
+    font: { color: "#e8eaf2", size: n.isMoc ? 15 : 11 },
+  }));
+  const edges = d.edges.map(e => ({ from: e.from, to: e.to, color: { color: "#3a4058" }, width: 1 }));
+  if (network) network.destroy();
+  network = new vis.Network($("graphBox"), { nodes, edges }, {
+    physics: {
+      barnesHut: { gravitationalConstant: -2500, springLength: 110, springConstant: 0.02 },
+      stabilization: { iterations: 120 },
+    },
+    nodes: { borderWidth: 0 },
+    interaction: { hover: true, tooltipDelay: 100 },
+  });
+  network.on("click", p => {
+    if (p.nodes.length) { switchSub("list"); openNote(p.nodes[0]); }
+  });
+}
+
+// ---------- delete note ----------
+$("deleteNoteBtn").onclick = async () => {
+  if (!currentNotePath) return;
+  if (!confirm("Delete this note? This also removes it from Obsidian.")) return;
+  const r = await fetch("/api/delete", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path: currentNotePath })
+  });
+  if (r.ok) { showLibraryHome(); loadTopics(); }
+  else alert("Delete failed");
+};
+</script>
+</body>
+</html>

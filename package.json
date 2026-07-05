@@ -1,0 +1,17 @@
+{
+  "name": "learnforge",
+  "version": "1.0.0",
+  "description": "Agent-powered learning platform: topic in, structured Obsidian knowledge graph out",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
