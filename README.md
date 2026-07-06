@@ -65,3 +65,7 @@ MOCK_LLM=1 npm start        (PowerShell: $env:MOCK_LLM="1"; npm start)
 ```
 
 Runs the whole pipeline with a fake model — useful to verify setup.
+
+## License
+
+[MIT](LICENSE)

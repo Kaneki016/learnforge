@@ -140,6 +140,17 @@
   .g-easy { background: var(--accent2); color: #1a1a1a; }
   .review-count { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
   #noteBody li.moc-item input[type=checkbox] { cursor: pointer; }
+  /* wikilink hover card */
+  .wiki-card { position: fixed; z-index: 1000; width: 300px; max-width: calc(100vw - 24px);
+    background: var(--panel2); border: 1px solid var(--accent2); border-radius: 10px;
+    padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 13px; line-height: 1.5; }
+  .wiki-card.hidden { display: none; }
+  .wiki-card .wc-title { font-weight: 700; color: var(--text); font-size: 13.5px; margin-bottom: 6px; }
+  .wiki-card ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .wiki-card li { margin-bottom: 3px; }
+  .wiki-card .wc-empty { color: var(--muted); font-style: italic; }
+  .wiki-card .wc-hint { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+    color: var(--accent2); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -529,14 +540,18 @@ async function openNoteByTitle(title) {
 }
 
 function renderNote(md) {
+  hideWikiCard();
   // Strip YAML frontmatter.
   let body = md.replace(/^---\n[\s\S]*?\n---\n/, "");
   // Obsidian callouts -> plain blockquotes with an emoji.
   body = body.replace(/> \[!(\w+)\]\s*/g, (_, t) =>
     `> ${({info:"ℹ️",success:"🏁",question:"💬"}[t] || "📌")} `);
-  // Wikilinks -> internal anchors.
-  body = body.replace(/\[\[([^\]]+)\]\]/g, (_, name) =>
-    `<a class="wiki" data-wiki="${escapeHtml(name)}">${escapeHtml(name)}</a>`);
+  // Wikilinks (with optional |alias) -> internal anchors.
+  body = body.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, target, alias) => {
+    const t = target.trim();
+    const display = (alias || t).trim();
+    return `<a class="wiki" data-wiki="${escapeHtml(t)}">${escapeHtml(display)}</a>`;
+  });
   const html = marked.parse(body, { breaks: true });
   $("noteBody").innerHTML = html;
 
@@ -550,17 +565,21 @@ function renderNote(md) {
   try { mermaid.run({ nodes: $("noteBody").querySelectorAll("pre.mermaid") }); } catch (e) {}
 
   // Wikilink navigation: same topic folder first, then anywhere in the vault.
-  $("noteBody").querySelectorAll("a.wiki").forEach(a => a.onclick = async () => {
-    const name = a.dataset.wiki;
-    const r = await fetch(`/api/note?path=${encodeURIComponent(`${currentTopicName}/${name}.md`)}`);
-    if (r.ok) {
-      const d = await r.json();
-      currentNotePath = `${currentTopicName}/${name}.md`;
-      renderNote(d.content);
-      window.scrollTo(0, 0);
-    } else {
-      openNoteByTitle(name);
-    }
+  $("noteBody").querySelectorAll("a.wiki").forEach(a => {
+    a.onclick = async () => {
+      hideWikiCard();
+      const name = a.dataset.wiki;
+      const r = await fetch(`/api/note?path=${encodeURIComponent(`${currentTopicName}/${name}.md`)}`);
+      if (r.ok) {
+        const d = await r.json();
+        currentNotePath = `${currentTopicName}/${name}.md`;
+        renderNote(d.content);
+        window.scrollTo(0, 0);
+      } else {
+        openNoteByTitle(name);
+      }
+    };
+    hookWikiHover(a);
   });
 
   // Roadmap checkboxes: make them clickable and persist to the MOC file.
@@ -580,6 +599,86 @@ function renderNote(md) {
     });
   }
 }
+
+// ---------- wikilink hover cards ----------
+const wikiCache = new Map(); // target name -> { title, points } | null
+let wikiCardEl = null, wikiShowTimer = null, wikiHideTimer = null;
+
+function ensureWikiCard() {
+  if (wikiCardEl) return wikiCardEl;
+  wikiCardEl = document.createElement("div");
+  wikiCardEl.className = "wiki-card hidden";
+  document.body.appendChild(wikiCardEl);
+  wikiCardEl.addEventListener("mouseenter", () => clearTimeout(wikiHideTimer));
+  wikiCardEl.addEventListener("mouseleave", () => scheduleHideWikiCard());
+  return wikiCardEl;
+}
+
+function hideWikiCard() {
+  clearTimeout(wikiShowTimer);
+  clearTimeout(wikiHideTimer);
+  if (wikiCardEl) wikiCardEl.classList.add("hidden");
+}
+
+function scheduleHideWikiCard() {
+  clearTimeout(wikiHideTimer);
+  wikiHideTimer = setTimeout(() => ensureWikiCard().classList.add("hidden"), 150);
+}
+
+function extractKeyPoints(md) {
+  const section = (md.split(/^## Key points$/m)[1] || "").split(/^## /m)[0];
+  return section.split("\n").map(l => l.trim()).filter(l => l.startsWith("- "))
+    .map(l => l.slice(2).trim().replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, t, a) => (a || t).trim()));
+}
+
+async function resolveWikiTarget(name) {
+  if (wikiCache.has(name)) return wikiCache.get(name);
+  let r = await fetch(`/api/note?path=${encodeURIComponent(`${currentTopicName}/${name}.md`)}`);
+  if (!r.ok) {
+    const sr = await (await fetch(`/api/search?q=${encodeURIComponent(name)}`)).json();
+    const hit = (sr.results || []).find(x => x.title === name);
+    r = hit ? await fetch(`/api/note?path=${encodeURIComponent(hit.path)}`) : null;
+  }
+  if (!r || !r.ok) { wikiCache.set(name, null); return null; }
+  const d = await r.json();
+  const info = { title: name, points: extractKeyPoints(d.content) };
+  wikiCache.set(name, info);
+  return info;
+}
+
+function showWikiCard(anchor, info) {
+  const card = ensureWikiCard();
+  card.innerHTML = `<div class="wc-title">${escapeHtml(info.title)}</div>` +
+    (info.points.length
+      ? `<ul>${info.points.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`
+      : `<div class="wc-empty">No key points yet.</div>`) +
+    `<div class="wc-hint">Click to open the full note →</div>`;
+  card.classList.remove("hidden");
+  const r = anchor.getBoundingClientRect();
+  const cw = card.offsetWidth, ch = card.offsetHeight;
+  let left = Math.min(r.left, window.innerWidth - cw - 12);
+  let top = r.bottom + 8;
+  if (top + ch > window.innerHeight - 12) top = r.top - ch - 8;
+  card.style.left = `${Math.max(12, left)}px`;
+  card.style.top = `${Math.max(12, top)}px`;
+}
+
+function hookWikiHover(a) {
+  a.addEventListener("mouseenter", () => {
+    clearTimeout(wikiHideTimer);
+    clearTimeout(wikiShowTimer);
+    wikiShowTimer = setTimeout(async () => {
+      const info = await resolveWikiTarget(a.dataset.wiki);
+      if (info) showWikiCard(a, info);
+    }, 250);
+  });
+  a.addEventListener("mouseleave", () => {
+    clearTimeout(wikiShowTimer);
+    scheduleHideWikiCard();
+  });
+}
+
+window.addEventListener("scroll", () => hideWikiCard(), true);
 
 // ---------- ask the agent ----------
 $("askBtn").onclick = async () => {
