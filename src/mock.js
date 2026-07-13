@@ -22,6 +22,32 @@ export function mockResponse(user) {
     });
   }
 
+  if (user.includes("Concepts covered:")) {
+    // Exercises agent: "Applications" module practicable, "Foundations" not (tests both paths).
+    if (user.includes("Module: Foundations")) {
+      return JSON.stringify({ applicable: false, reason: "Mock: purely conceptual." });
+    }
+    return JSON.stringify({
+      applicable: true,
+      exercises: [
+        {
+          title: "Apply Delta by hand",
+          difficulty: "easy",
+          task: "Work through a small Delta Concept example on paper.",
+          hints: ["Start from the definition.", "Draw it out."],
+          solution: "Your result should match the worked example.",
+        },
+        {
+          title: "Build a tiny Epsilon",
+          difficulty: "medium",
+          task: "Build a minimal Epsilon Concept project.",
+          hints: ["Keep it under 20 lines."],
+          solution: "It runs and produces the expected output.",
+        },
+      ],
+    });
+  }
+
   if (user.includes("QUESTION:")) {
     const q = (user.match(/QUESTION: (.+)/) || [])[1] || "";
     return `Mock clarification: here is a deeper explanation responding to "${q}". It references the note content and gives an example.`;

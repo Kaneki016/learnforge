@@ -135,7 +135,48 @@ Respond ONLY with JSON:
   ]
 }`;
 
-// ---------- 4. Clarify agent (comments on existing notes) ----------
+// ---------- 4. Exercises agent (per module, only where practicable) ----------
+
+const EXERCISES_SYSTEM = `You design hands-on practice for one module of a learning path.
+
+First decide honestly: can this module genuinely be practiced by DOING — coding, calculating, writing, building, experimenting, or applying a method to a concrete case? Purely conceptual, historical, or overview modules are NOT applicable.
+
+If not applicable, respond ONLY: {"applicable": false, "reason": "one sentence"}
+
+If applicable, produce 2-4 exercises ordered easy -> hard. Each must be:
+- Concrete and self-contained: doable at a desk with common tools, all needed data/setup included inline.
+- Verifiable: the learner can check their own result against your solution or success criteria.
+
+Respond ONLY with JSON:
+{
+  "applicable": true,
+  "exercises": [
+    {
+      "title": "short imperative title",
+      "difficulty": "easy|medium|hard",
+      "task": "clear instructions of what to do",
+      "hints": ["hint 1", "hint 2"],
+      "solution": "model solution or success criteria to check against"
+    }
+  ]
+}`;
+
+export async function writeModuleExercises(topic, module) {
+  const text = await callLLM({
+    system: EXERCISES_SYSTEM,
+    user: [
+      `Topic: ${topic}`,
+      `Module: ${module.name} — ${module.goal}`,
+      `Concepts covered: ${module.concepts.join("; ")}`,
+    ].join("\n"),
+    maxTokens: 5000,
+  });
+  const json = extractJSON(text);
+  if (!json.applicable) return null;
+  return Array.isArray(json.exercises) && json.exercises.length ? json.exercises : null;
+}
+
+// ---------- 5. Clarify agent (comments on existing notes) ----------
 
 const CLARIFY_SYSTEM = `You are a patient expert teacher. The learner is reading one of their study notes and asks a follow-up question about it.
 Answer the question clearly and concretely in 80-250 words of plain markdown (no headings, no code fences unless showing code/math). Ground your answer in the note's content, add an example if it helps, and be honest if the question goes beyond the note's scope.`;
