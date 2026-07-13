@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scopeTopic, planCurriculum, writeModuleNotes, clarifyNote } from "./agents.js";
+import { scopeTopic, planCurriculum, writeModuleNotes, writeModuleExercises, clarifyNote } from "./agents.js";
 import {
   writeVault,
   vaultPath,
@@ -65,6 +65,7 @@ app.post("/api/generate", async (req, res) => {
     const existingConcepts = getAllConceptNames().slice(0, 150);
     const allConcepts = [...plan.modules.flatMap((m) => m.concepts), ...existingConcepts];
     const notesByModule = [];
+    const exercisesByModule = [];
     for (const [i, module] of plan.modules.entries()) {
       send("status", {
         msg: `Writing notes — module ${i + 1}/${plan.modules.length}: ${module.name}`,
@@ -77,10 +78,22 @@ app.post("/api/generate", async (req, res) => {
         send("warn", { msg: `Module "${module.name}" notes failed: ${e.message}` });
       }
       send("moduleDone", { module: i, count: notesByModule[i].length });
+
+      send("status", {
+        msg: `Designing practice exercises — module ${i + 1}/${plan.modules.length}: ${module.name}`,
+        module: i,
+      });
+      try {
+        exercisesByModule[i] = await writeModuleExercises(topic, module);
+      } catch (e) {
+        exercisesByModule[i] = null;
+        send("warn", { msg: `Module "${module.name}" exercises failed: ${e.message}` });
+      }
+      send("exercisesDone", { module: i, count: exercisesByModule[i]?.length || 0 });
     }
 
     send("status", { msg: "Writing notes into your Obsidian vault…" });
-    const result = writeVault(topic, plan, notesByModule, existingConcepts);
+    const result = writeVault(topic, plan, notesByModule, existingConcepts, exercisesByModule);
     send("done", {
       vault: vaultPath(),
       topicDir: result.topicDir,

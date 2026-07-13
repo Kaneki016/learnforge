@@ -86,7 +86,7 @@ function roadmapDiagram(plan) {
 
 // ---------- writing a new topic ----------
 
-export function writeVault(topic, plan, notesByModule, extraLinkable = []) {
+export function writeVault(topic, plan, notesByModule, extraLinkable = [], exercisesByModule = []) {
   const root = vaultPath();
   const topicName = safeName(plan.title || topic);
   const topicDir = path.join(root, topicName);
@@ -135,6 +135,33 @@ export function writeVault(topic, plan, notesByModule, extraLinkable = []) {
       fs.writeFileSync(file, body, "utf8");
       files.push(file);
     }
+
+    // --- exercises note for this module (only when the agent deemed it practicable) ---
+    const exs = exercisesByModule[mi];
+    if (exs && exs.length) {
+      const exName = safeName(`${module.name} — Exercises`);
+      const quote = (s) => String(s).replace(/\n/g, "\n> ");
+      const exLines = [
+        fm({
+          tags: [`topic/${topicTag}`, `module/${tagify(module.name)}`, "exercises"],
+          topic: `"[[${topicName} MOC]]"`,
+          created: today,
+        }),
+        `# ${exName}`,
+        "",
+        `> [!info] Practice for [[${topicName} MOC]] · Module ${mi + 1}: ${module.name}`,
+        "",
+      ];
+      exs.forEach((ex, i) => {
+        exLines.push(`## ${i + 1}. ${safeName(ex.title || "Exercise")} · *${ex.difficulty || "medium"}*`, "", ex.task || "", "");
+        (ex.hints || []).forEach((h, j) => exLines.push(`> [!question]- Hint ${j + 1}`, `> ${quote(h)}`, ""));
+        if (ex.solution) exLines.push(`> [!success]- Solution / success criteria`, `> ${quote(ex.solution)}`, "");
+      });
+      exLines.push("💬 *Tip: in the app, paste your attempt into the \"Ask the agent\" box below for feedback.*");
+      const exFile = path.join(topicDir, `${exName}.md`);
+      fs.writeFileSync(exFile, exLines.join("\n"), "utf8");
+      files.push(exFile);
+    }
   }
 
   // --- MOC / roadmap note ---
@@ -164,6 +191,9 @@ export function writeVault(topic, plan, notesByModule, extraLinkable = []) {
         ...module.resources.map((r) => `- *${r.type || "resource"}*: **${r.title}** — ${r.why || ""}`),
         ""
       );
+    }
+    if (exercisesByModule[mi]?.length) {
+      mocLines.push(`**Practice**: 🛠 [[${safeName(`${module.name} — Exercises`)}]]`, "");
     }
     if (module.milestone) mocLines.push(`> [!success] Milestone: ${module.milestone}`, "");
   }

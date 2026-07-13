@@ -26,6 +26,10 @@ vault/
     <Concept>.md               ← one linked note per concept
 ```
 
+## Practice exercises
+
+For each module, an exercises agent first judges whether the material can genuinely be practiced by doing (coding, calculating, writing, building). If so, it creates a "*Module* — Exercises" note with 2–4 exercises ordered easy → hard, each with collapsible hints and a solution/success criteria (folded callouts in Obsidian, click-to-reveal in the app). The roadmap links each module's exercises under **Practice**. Paste your attempt into the note's "Ask the agent" box for feedback — the exchange is saved into the note. Purely conceptual modules are skipped automatically.
+
 ## Review tab (spaced repetition)
 
 Every concept note's review Q&As become flashcards. The **Review** tab shows what's due (SM-2 scheduling: Again / Hard / Good / Easy), with a due-count badge. Schedule state lives in `vault/.learnforge/review.json`.
